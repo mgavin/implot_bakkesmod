@@ -141,6 +141,8 @@ struct ImPlotStyle {
         using transform_func      = std::string (*)(float);
         transform_func x_label_tf = nullptr;
         transform_func y_label_tf = nullptr;
+        transform_func x_mouse_tf = nullptr;
+        transform_func y_mouse_tf = nullptr;
         float          LineWeight;               // = 1, line weight in pixels
         ImPlotMarker   Marker;                   // = ImPlotMarker_None, marker specification
         float          MarkerSize;               // = 4, marker size in pixels (roughly the marker's "radius")

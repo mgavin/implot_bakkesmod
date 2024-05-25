@@ -59,9 +59,12 @@ removed. This was done to support multi-y-axis.
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
+#include <cstdio>
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "implot.h"
+
+#include "../ShowPlayerPopulation/Logger.h"
 
 #ifdef _MSC_VER
 #define sprintf sprintf_s
@@ -644,7 +647,7 @@ inline void GetTicks(const ImPlotRange & scale, int nMajor, int nMinor, bool log
 
 inline void LabelTicks(ImVector<ImTick> & ticks, bool scientific, ImGuiTextBuffer & buffer) {
         buffer.Buf.resize(0);
-        char temp[32];
+        char temp[32] = {0};
         for (int t = 0; t < ticks.Size; t++) {
                 ImTick * tk = &ticks[t];
                 if (tk->RenderLabel) {
@@ -661,6 +664,17 @@ inline void LabelTicks(ImVector<ImTick> & ticks, bool scientific, ImGuiTextBuffe
 }
 
 inline void LabelTicksTransform(ImVector<ImTick> & ticks, ImGuiTextBuffer & buffer, std::string (*tfunc)(float)) {
+        buffer.Buf.resize(0);
+        char temp[32] = {0};
+        for (int t = 0; t < ticks.Size; ++t) {
+                ImTick * tk = &ticks[t];
+                if (tk->RenderLabel) {
+                        tk->TextOffset = buffer.size();
+                        snprintf(temp, 32, "%s", tfunc(tk->PlotPos).c_str());
+                }
+                buffer.append(temp, temp + strlen(temp) + 1);
+                tk->Size = ImGui::CalcTextSize(buffer.Buf.Data + tk->TextOffset);
+        }
 }
 
 namespace {
@@ -939,7 +953,9 @@ bool BeginPlot(
 
         // frame
         const ImVec2 frame_size = ImGui::CalcItemSize(size, default_w, default_h);
-        gp.BB_Frame             = ImRect(Window->DC.CursorPos, Window->DC.CursorPos + frame_size);
+        gp.BB_Frame =
+                ImRect(Window->DC.CursorPos,
+                       Window->DC.CursorPos + frame_size - ImVec2 {0, ImGui::GetTextLineHeight() * 2});
         ImGui::ItemSize(gp.BB_Frame);
         if (!ImGui::ItemAdd(gp.BB_Frame, 0, &gp.BB_Frame)) {
                 gp.NextPlotData = ImNextPlotData();
@@ -951,7 +967,6 @@ bool BeginPlot(
         }
         gp.Hov_Frame = ImGui::ItemHoverable(gp.BB_Frame, ID);
         ImGui::RenderFrame(gp.BB_Frame.Min, gp.BB_Frame.Max, gp.Col_Frame, true, Style.FrameRounding);
-
         // canvas bb
         gp.BB_Canvas = ImRect(gp.BB_Frame.Min + Style.WindowPadding, gp.BB_Frame.Max - Style.WindowPadding);
 
@@ -990,14 +1005,15 @@ bool BeginPlot(
         // label ticks
         // label x ticks
         if (HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_TickLabels)) {
-                if (bool b = HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_Scientific)) {
-                        LabelTicks(gp.XTicks, b, gp.XTickLabels);
-                } else if (HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_CustomFormat)) {
+                if (HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_CustomFormat)) {
                         IM_ASSERT_USER_ERROR(
-                                ImPlot::GetStyle().X_label_tf == nullptr,
-                                "Custom X-Axis Format Flag Set But No Corresponding Function In ImPlot::GetStyle() "
+                                ImPlot::GetStyle().x_label_tf == nullptr,
+                                "Custom X-Axis Format Flag Set But No Corresponding Function In "
+                                "ImPlot::GetStyle() "
                                 "Defined!");
                         LabelTicksTransform(gp.XTicks, gp.XTickLabels, ImPlot::GetStyle().x_label_tf);
+                } else {
+                        LabelTicks(gp.XTicks, HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_Scientific), gp.XTickLabels);
                 }
         }
 
@@ -1005,15 +1021,19 @@ bool BeginPlot(
         float max_label_width[MAX_Y_AXES] = {};
         for (int i = 0; i < MAX_Y_AXES; i++) {
                 if (y[i].present && HasFlag(plot.YAxis[i].Flags, ImPlotAxisFlags_TickLabels)) {
-                        if (bool b = HasFlag(plot.YAxis[i].Flags, ImPlotAxisFlags_Scientific)) {
-                                LabelTicks(gp.YTicks[i], b, gp.YTickLabels[i]);
-                        } else if (HasFlag(plot.YAxis[i].Flags, ImPlotAxisFlags_CustomFormat)) {
+                        if (HasFlag(plot.YAxis[i].Flags, ImPlotAxisFlags_CustomFormat)) {
                                 IM_ASSERT_USER_ERROR(
                                         ImPlot::GetStyle().y_label_tf == nullptr,
                                         "Custom Y-Axis Format Flag Set But No Corresponding Function In "
                                         "ImPlot::GetStyle() Defined!");
                                 LabelTicksTransform(gp.YTicks[i], gp.YTickLabels[i], ImPlot::GetStyle().y_label_tf);
+                        } else {
+                                LabelTicks(
+                                        gp.YTicks[i],
+                                        HasFlag(plot.YAxis[i].Flags, ImPlotAxisFlags_Scientific),
+                                        gp.YTickLabels[i]);
                         }
+
                         for (int t = 0; t < gp.YTicks[i].Size; t++) {
                                 ImTick * yt        = &gp.YTicks[i][t];
                                 max_label_width[i] = yt->Size.x > max_label_width[i] ? yt->Size.x : max_label_width[i];
@@ -1032,7 +1052,8 @@ bool BeginPlot(
         const float    pad_left  = y_axis_pad(0) + (y_label ? txt_height + txt_off : 0);
         const float    pad_right = y_axis_pad(1) + y_axis_pad(2);
         gp.BB_Grid =
-                ImRect(gp.BB_Canvas.Min + ImVec2(pad_left, pad_top), gp.BB_Canvas.Max - ImVec2(pad_right, pad_bot));
+                ImRect(gp.BB_Canvas.Min + ImVec2(pad_left, pad_top),
+                       gp.BB_Canvas.Max - ImVec2(pad_right, pad_bot + ImGui::GetTextLineHeight()));
         gp.Hov_Grid = gp.BB_Grid.Contains(IO.MousePos);
 
         // axis region bbs
@@ -1866,7 +1887,14 @@ void EndPlot() {
                 char         buffer[128] = {};
                 BufferWriter writer(buffer, sizeof(buffer));
 
-                writer.Write("%.2f,%.2f", gp.LastMousePos[0].x, gp.LastMousePos[0].y);
+                if (HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_CustomFormat)) {
+                        writer.Write(
+                                "%s,%.2f",
+                                gp.Style.x_mouse_tf(gp.LastMousePos[0].x).c_str(),
+                                gp.LastMousePos[0].y);
+                } else {
+                        writer.Write("%.2f,%.2f", gp.LastMousePos[0].x, gp.LastMousePos[0].y);
+                }
                 if (HasFlag(plot.Flags, ImPlotFlags_YAxis2)) {
                         writer.Write(",(%.2f)", gp.LastMousePos[1].y);
                 }
