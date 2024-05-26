@@ -1889,7 +1889,7 @@ void EndPlot() {
 
                 if (HasFlag(plot.XAxis.Flags, ImPlotAxisFlags_CustomFormat)) {
                         writer.Write(
-                                "%s,%.2f",
+                                "%s%8.0f",
                                 gp.Style.x_mouse_tf(gp.LastMousePos[0].x).c_str(),
                                 gp.LastMousePos[0].y);
                 } else {
