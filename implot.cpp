@@ -670,7 +670,7 @@ inline void LabelTicksTransform(ImVector<ImTick> & ticks, ImGuiTextBuffer & buff
                 ImTick * tk = &ticks[t];
                 if (tk->RenderLabel) {
                         tk->TextOffset = buffer.size();
-                        snprintf(temp, 32, "%s", tfunc(tk->PlotPos).c_str());
+                        snprintf(temp, 32, "%s", tfunc(static_cast<float>(tk->PlotPos)).c_str());
                 }
                 buffer.append(temp, temp + strlen(temp) + 1);
                 tk->Size = ImGui::CalcTextSize(buffer.Buf.Data + tk->TextOffset);
@@ -2605,35 +2605,64 @@ inline void RenderLineStrip(
         if (i_start >= count) {
                 i_start -= count;
         }
-        int i_end = offset + count;
-        if (i_end >= count) {
-                i_end -= count;
-        }
+        int i_end = offset;
 
         const int segments = count - 1;
         ImVec2    p1       = transformer(getter(offset));
+        ImVec2    p2;
+        ImVec2    untransformedp1 = getter(offset);
+        ImVec2    untransformedp2;
         if (HasFlag(gp.CurrentPlot->Flags, ImPlotFlags_AntiAliased)) {
-                for (int i1 = i_start; i1 != i_end; i1 = i1 + 1 < count ? i1 + 1 : i1 + 1 - count) {
-                        ImVec2 p2 = transformer(getter(i1));
+                for (int i1 = i_start; i1 != i_end;
+                     i1 = i1 + 1 < count ? i1 + 1 : i1 + 1 - count, p1 = p2, untransformedp1 = untransformedp2) {
+                        untransformedp2 = getter(i1);
+                        p2              = transformer(getter(i1));
+
+                        if (HasFlag(gp.CurrentPlot->XAxis.Flags, ImPlotAxisFlags_SkipGap)) {
+                                if (untransformedp2.x - untransformedp1.x >= gp.Style.x_skip_gap_sz) {
+                                        continue;
+                                }
+                        }
+
+                        if (HasFlag(gp.CurrentPlot->YAxis[gp.CurrentPlot->CurrentYAxis].Flags,
+                                    ImPlotAxisFlags_SkipGap)) {
+                                if (untransformedp2.y - untransformedp1.y >= gp.Style.y_skip_gap_sz) {
+                                        continue;
+                                }
+                        }
 
                         if (!cull || gp.BB_Grid.Overlaps(ImRect(ImMin(p1, p2), ImMax(p1, p2)))) {
                                 RenderLineAA(DrawList, p1, p2, line_weight, col_line);
                         }
-                        p1 = p2;
                 }
         } else {
                 const ImVec2 uv = DrawList._Data->TexUvWhitePixel;
                 DrawList.PrimReserve(segments * 6, segments * 4);
                 int segments_culled = 0;
-                for (int i1 = i_start; i1 != i_end; i1 = i1 + 1 < count ? i1 + 1 : i1 + 1 - count) {
-                        ImVec2 p2 = transformer(getter(i1));
+
+                for (int i1 = i_start; i1 != i_end;
+                     i1 = i1 + 1 < count ? i1 + 1 : i1 + 1 - count, p1 = p2, untransformedp1 = untransformedp2) {
+                        untransformedp2 = getter(i1);
+                        p2              = transformer(getter(i1));
+
+                        if (HasFlag(gp.CurrentPlot->XAxis.Flags, ImPlotAxisFlags_SkipGap)) {
+                                if (untransformedp2.x - untransformedp1.x >= gp.Style.x_skip_gap_sz) {
+                                        continue;
+                                }
+                        }
+
+                        if (HasFlag(gp.CurrentPlot->YAxis[gp.CurrentPlot->CurrentYAxis].Flags,
+                                    ImPlotAxisFlags_SkipGap)) {
+                                if (untransformedp2.y - untransformedp1.y >= gp.Style.y_skip_gap_sz) {
+                                        continue;
+                                }
+                        }
 
                         if (!cull || gp.BB_Grid.Overlaps(ImRect(ImMin(p1, p2), ImMax(p1, p2)))) {
                                 RenderLine(DrawList, p1, p2, line_weight, col_line, uv);
                         } else {
                                 segments_culled++;
                         }
-                        p1 = p2;
                 }
                 if (segments_culled > 0) {
                         DrawList.PrimUnreserve(segments_culled * 6, segments_culled * 4);

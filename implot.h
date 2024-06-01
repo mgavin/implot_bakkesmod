@@ -67,7 +67,8 @@ enum ImPlotAxisFlags_ {
         ImPlotAxisFlags_LogScale   = 1 << 7,  // a logartithmic (base 10) axis scale will be used
         ImPlotAxisFlags_Scientific =
                 1 << 8,  // scientific notation will be used for tick labels if displayed (WIP, not very good yet)
-        ImPlotAxisFlags_CustomFormat = 1 << 9,  // labels values after passed through a transform function
+        ImPlotAxisFlags_CustomFormat = 1 << 9,   // labels values after passed through a transform function
+        ImPlotAxisFlags_SkipGap      = 1 << 10,  // Subsequent elements of a plot aren't drawn if not within gap
         ImPlotAxisFlags_Default = ImPlotAxisFlags_GridLines | ImPlotAxisFlags_TickMarks | ImPlotAxisFlags_TickLabels
                                   | ImPlotAxisFlags_Adaptive,
         ImPlotAxisFlags_Auxiliary = ImPlotAxisFlags_Default & ~ImPlotAxisFlags_GridLines,
@@ -138,20 +139,22 @@ struct ImPlotLimits {
 
 // Plot style structure
 struct ImPlotStyle {
-        using transform_func      = std::string (*)(float);
-        transform_func x_label_tf = nullptr;
-        transform_func y_label_tf = nullptr;
-        transform_func x_mouse_tf = nullptr;
-        transform_func y_mouse_tf = nullptr;
-        float          LineWeight;               // = 1, line weight in pixels
-        ImPlotMarker   Marker;                   // = ImPlotMarker_None, marker specification
-        float          MarkerSize;               // = 4, marker size in pixels (roughly the marker's "radius")
-        float          MarkerWeight;             // = 1, outline weight of markers in pixels
-        float          ErrorBarSize;             // = 5, error bar whisker width in pixels
-        float          ErrorBarWeight;           // = 1.5, error bar whisker weight in pixels
-        float          DigitalBitHeight;         // = 8, digital channels bit height (at y = 1.0f) in pixels
-        float          DigitalBitGap;            // = 4, digital channels bit padding gap in pixels
-        ImVec4         Colors[ImPlotCol_COUNT];  // array of plot specific colors
+        using transform_func       = std::string (*)(float);
+        transform_func x_label_tf  = nullptr;
+        transform_func y_label_tf  = nullptr;
+        transform_func x_mouse_tf  = nullptr;
+        transform_func y_mouse_tf  = nullptr;
+        std::size_t  x_skip_gap_sz = std::numeric_limits<std::size_t>::max();  // contents within gap don't get skipped
+        std::size_t  y_skip_gap_sz = std::numeric_limits<std::size_t>::max();
+        float        LineWeight;               // = 1, line weight in pixels
+        ImPlotMarker Marker;                   // = ImPlotMarker_None, marker specification
+        float        MarkerSize;               // = 4, marker size in pixels (roughly the marker's "radius")
+        float        MarkerWeight;             // = 1, outline weight of markers in pixels
+        float        ErrorBarSize;             // = 5, error bar whisker width in pixels
+        float        ErrorBarWeight;           // = 1.5, error bar whisker weight in pixels
+        float        DigitalBitHeight;         // = 8, digital channels bit height (at y = 1.0f) in pixels
+        float        DigitalBitGap;            // = 4, digital channels bit padding gap in pixels
+        ImVec4       Colors[ImPlotCol_COUNT];  // array of plot specific colors
         ImPlotStyle();
 };
 
